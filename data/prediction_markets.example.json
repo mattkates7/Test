@@ -1,0 +1,52 @@
+{
+  "_note": "FICTIONAL EXAMPLES for learning the format. Replace with markets and sources you research yourself. 'as_of' sets the date used for staleness checks (delete it to use today).",
+  "as_of": "2026-10-10",
+  "markets": [
+    {
+      "market": "EXAMPLE: Will Fictional City approve its new transit budget by Dec 31?",
+      "implied_probability": 0.62,
+      "resolution_criteria": "Resolves YES if the city council records a passing vote on the budget before 2026-12-31 23:59 UTC.",
+      "evidence_yes": [
+        {"claim": "Council majority publicly said they support the budget", "source": "local newspaper", "date": "2026-10-05", "quality": "moderate"},
+        {"claim": "Committee approved the draft", "source": "council meeting minutes", "date": "2026-10-02", "quality": "strong"}
+      ],
+      "evidence_no": [
+        {"claim": "Two members asked for a delay", "source": "social media post", "date": "2026-10-08", "quality": "weak"}
+      ],
+      "unknowns": ["Whether the vote gets scheduled before the holiday recess"],
+      "upcoming_events": ["Full council session on 2026-11-14"],
+      "my_estimate_low": 0.55,
+      "my_estimate_high": 0.75
+    },
+    {
+      "market": "EXAMPLE: Will Fictional Corp ship product X this quarter?",
+      "implied_probability": 0.30,
+      "resolution_criteria": "Resolves YES if product X is generally available before 2026-12-31.",
+      "evidence_yes": [
+        {"claim": "CEO hinted at a launch 'soon'", "source": "podcast interview", "date": "2026-08-01", "quality": "weak"}
+      ],
+      "evidence_no": [],
+      "unknowns": ["No official date announced"],
+      "upcoming_events": [],
+      "my_estimate_low": 0.5,
+      "my_estimate_high": 0.7
+    },
+    {
+      "market": "EXAMPLE: Will Fictional League match be postponed?",
+      "implied_probability": 0.12,
+      "resolution_criteria": "Resolves YES if the league officially postpones the match.",
+      "evidence_yes": [
+        {"claim": "Official league notice: stadium inspection failed", "source": "league website", "date": "2026-10-09", "quality": "strong"},
+        {"claim": "Local authority confirms inspection outcome", "source": "city press release", "date": "2026-10-09", "quality": "strong"},
+        {"claim": "Teams told to prepare alternate venue", "source": "two beat reporters", "date": "2026-10-09", "quality": "moderate"}
+      ],
+      "evidence_no": [
+        {"claim": "League says alternate venue is possible instead of postponing", "source": "league website", "date": "2026-10-09", "quality": "strong"}
+      ],
+      "unknowns": ["Whether an alternate venue counts as no postponement"],
+      "upcoming_events": ["Re-inspection on 2026-10-12"],
+      "my_estimate_low": 0.25,
+      "my_estimate_high": 0.4
+    }
+  ]
+}

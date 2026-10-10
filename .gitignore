@@ -1,0 +1,14 @@
+# Secrets never get committed
+.env
+
+# Generated data and outputs (re-create them with the CLI)
+data/*.csv
+data/*.meta.json
+logs/*
+!logs/.gitkeep
+results/*
+!results/.gitkeep
+
+__pycache__/
+*.pyc
+.venv/
