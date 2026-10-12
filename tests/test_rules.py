@@ -146,6 +146,14 @@ class ResearchTests(unittest.TestCase):
             self.assertEqual(w["verdict"], "INSUFFICIENT SAMPLE")
 
 
+class StrategySearchTests(unittest.TestCase):
+    def test_walk_forward_runs_and_random_data_is_not_a_bonanza(self):
+        from src import strategy_search
+        report = strategy_search.run(data_loader.make_synthetic_candles(days=1200, seed=5), CFG)
+        self.assertEqual(report["candidates_tested"], len(report["table"]))
+        self.assertLess(report["walk_forward"]["t_stat"], 3)
+
+
 class PredictionMarketTests(unittest.TestCase):
     def test_stale_or_weak_evidence_skips(self):
         m = {"market": "x", "implied_probability": 0.3, "resolution_criteria": "y",

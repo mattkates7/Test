@@ -93,6 +93,20 @@ If you use your own CSV, give it the columns `timestamp,open,high,low,close,volu
 hourly candles. `timestamp` can be unix seconds or ISO format, in UTC. Then point
 `data.csv_path` in `config.json` at it.
 
+## Strategy search (`search`)
+
+```bash
+python -m src.main search
+```
+
+This tests 23 long-only strategies on daily candles: breakouts, moving averages, momentum, dip-buying,
+and calendar rules. Every one has a stop, pays costs, and risks 1% per trade with no leverage.
+It prints two things:
+
+- **A full-period table.** It shows every strategy over all of history. This is biased: the best row was picked after seeing all the data.
+- **A walk-forward result.** At the start of each year, the program picks the best strategy using only
+  earlier data, then trades it for that year. This is the honest estimate of the whole "search, pick, trade" process.
+
 ## Strategy 2: trend-following breakout (`config.breakout.json`)
 
 ```bash

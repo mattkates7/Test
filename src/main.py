@@ -7,7 +7,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from . import dashboard, data_loader, prediction_markets, temporal_research
+from . import dashboard, data_loader, prediction_markets, strategy_search, temporal_research
 from . import probability_update as pu
 from .backtest import run_backtest
 from .config import load_config, load_env, resolve_path
@@ -67,6 +67,15 @@ def cmd_research(cfg, args):
     temporal_research.save_report(report, res / "temporal_research.json", res / "temporal_research.csv")
     temporal_research.print_report(report)
     print(f"\nSaved to {res / 'temporal_research.csv'} and .json")
+
+
+def cmd_search(cfg, args):
+    candles, _ = _load_data(cfg)
+    report = strategy_search.run(candles, cfg)
+    res = _paths()["results"]
+    strategy_search.save(report, res / "strategy_search.json", res / "strategy_search.csv")
+    strategy_search.print_report(report)
+    print(f"\nSaved to {res / 'strategy_search.csv'} and .json")
 
 
 def cmd_backtest(cfg, args):
@@ -144,6 +153,8 @@ def build_parser():
     s.set_defaults(func=cmd_make_sample_data)
 
     sub.add_parser("research", help="temporal bias research (Step 2)").set_defaults(func=cmd_research)
+
+    sub.add_parser("search", help="test many strategy types + honest walk-forward").set_defaults(func=cmd_search)
 
     s = sub.add_parser("backtest", help="walk-forward paper backtest (Steps 3-7, 9)")
     s.add_argument("--show", type=int, default=3, help="how many trade/blocked tickets to print")
