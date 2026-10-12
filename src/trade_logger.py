@@ -75,7 +75,7 @@ class TradeLogger:
                 "Entry": round(t.entry, 2),
                 "Exit": round(t.exit, 2),
                 "Stop": round(t.stop, 2),
-                "Target": round(t.target, 2),
+                "Target": round(t.target, 2) if t.target else "trailing",
                 "Paper position size": round(t.size, 6),
                 "Maximum dollar risk": round(t.max_dollar_risk, 2),
                 "Volatility classification": t.volatility,

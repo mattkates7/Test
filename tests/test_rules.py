@@ -120,6 +120,19 @@ class ExecutionTests(unittest.TestCase):
             ex.open_trade(date(2024, 1, 1), 2, sig, 100, 99, 102, sizing, 0.5, "LOW", vol)
 
 
+    def test_trailing_stop_only_tightens(self):
+        ex = PaperExecutor("BTC-USD", 0.0, 0.0)
+        sig = SimpleNamespace(window="breakout", direction="long", reason="test")
+        sizing = SimpleNamespace(position_size=1, dollar_risk=10)
+        vol = SimpleNamespace(condition="CLEAN")
+        ex.open_trade(date(2024, 1, 1), 0, sig, 100, 90, None, sizing, 0.5, "LOW", vol)
+        bar = lambda o, h, l, c: data_loader.Candle(date(2024, 1, 2), o, h, l, c, 1)  # noqa: E731
+        self.assertIsNone(ex.check_exit(bar(100, 110, 99, 108), 1, 365, trail_level=95))
+        self.assertIsNone(ex.check_exit(bar(108, 109, 96, 100), 2, 365, trail_level=80))  # can't loosen
+        t = ex.check_exit(bar(100, 101, 94, 95), 3, 365, trail_level=None)
+        self.assertEqual((t.exit, t.exit_reason), (95, "trailing stop hit"))
+
+
 class ResearchTests(unittest.TestCase):
     def test_random_walk_has_no_edge(self):
         candles = data_loader.make_synthetic_candles(days=400, seed=11)

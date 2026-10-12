@@ -93,6 +93,21 @@ If you use your own CSV, give it the columns `timestamp,open,high,low,close,volu
 hourly candles. `timestamp` can be unix seconds or ISO format, in UTC. Then point
 `data.csv_path` in `config.json` at it.
 
+## Strategy 2: trend-following breakout (`config.breakout.json`)
+
+```bash
+python -m src.main --config config.breakout.json backtest
+```
+
+The price is resampled to daily candles. The strategy goes long the day after BTC closes
+above its 20-day high. The starting stop is 2 x ATR below entry, and then it trails at the
+lowest low of the last 10 days. There is no fixed target. Everything else is the same as
+the main strategy: 1% risk, volatility filter, no chasing, Bayesian updates, and full logging.
+
+It trades rarely, so the costs stay small, but there are few trades to learn from.
+Only about 20 setups appeared in 2018-2022. With `risk.min_sample_size: 100`
+the system therefore refuses to trade it. That is the "tiny sample" rule working as intended.
+
 ## How the backtest avoids fooling you
 
 1. **Train/test split.** Research and the starting estimates use only the first part

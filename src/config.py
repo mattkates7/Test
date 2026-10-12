@@ -68,10 +68,21 @@ def validate_config(config):
     strat = config["strategy"]
     if strat["direction"] not in ("long", "short"):
         raise ConfigError('strategy.direction must be "long" or "short".')
-    if strat["stop_atr_multiple"] <= 0 or strat["reward_to_risk"] <= 0:
-        raise ConfigError("strategy.stop_atr_multiple and reward_to_risk must be positive.")
-    if strat["window_type"] not in ("hour_of_day", "day_of_week", "session"):
+    stype = strat.get("type", "temporal_window")
+    if stype not in ("temporal_window", "breakout"):
+        raise ConfigError('strategy.type must be "temporal_window" or "breakout".')
+    if strat["stop_atr_multiple"] <= 0:
+        raise ConfigError("strategy.stop_atr_multiple must be positive (every trade needs a stop).")
+    if strat.get("reward_to_risk") is not None and strat["reward_to_risk"] <= 0:
+        raise ConfigError("strategy.reward_to_risk must be positive, or null for trailing-stop exits.")
+    if stype == "temporal_window" and strat["window_type"] not in ("hour_of_day", "day_of_week", "session"):
         raise ConfigError('strategy.window_type must be "hour_of_day", "day_of_week" or "session".')
+    if stype == "breakout":
+        for key in ("timeframe_hours", "channel_bars", "trail_exit_bars"):
+            if not isinstance(strat.get(key), int) or strat[key] < 1:
+                raise ConfigError(f"strategy.{key} must be a positive whole number for breakout.")
+        if 24 % strat["timeframe_hours"]:
+            raise ConfigError("strategy.timeframe_hours must divide 24 (1, 2, 3, 4, 6, 8, 12 or 24).")
 
     bt = config["backtest"]
     if not 0.2 <= bt["train_fraction"] <= 0.8:

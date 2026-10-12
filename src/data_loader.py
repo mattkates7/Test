@@ -185,3 +185,25 @@ def import_cryptodatadownload(src_path):
         candles.append(Candle(datetime.fromtimestamp(ts, tz=timezone.utc), o, h, l, c, min(vols) if vols else 0.0))
     candles.sort(key=lambda x: x.ts)
     return candles
+
+
+def resample(candles, hours):
+    """Combine hourly candles into `hours`-long candles (24 = daily), aligned to UTC midnight."""
+    if hours == 1:
+        return candles
+    out, bucket, key = [], [], None
+    for c in candles:
+        k = (c.ts.date(), c.ts.hour // hours)
+        if bucket and k != key:
+            out.append(_merge(bucket))
+            bucket = []
+        key = k
+        bucket.append(c)
+    if bucket:
+        out.append(_merge(bucket))
+    return out
+
+
+def _merge(b):
+    return Candle(b[0].ts, b[0].open, max(x.high for x in b), min(x.low for x in b),
+                  b[-1].close, sum(x.volume for x in b))

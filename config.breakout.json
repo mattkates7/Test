@@ -1,0 +1,90 @@
+{
+  "mode": "paper",
+  "account": {
+    "starting_balance": 10000
+  },
+  "risk": {
+    "max_risk_per_trade_pct": 1.0,
+    "kelly_multiplier": 0.25,
+    "min_sample_size": 100,
+    "max_open_positions": 1,
+    "leverage": 1.0,
+    "never_increase_risk_after_loss": true
+  },
+  "strategy": {
+    "type": "breakout",
+    "name": "20-day breakout, 10-day-low trailing stop",
+    "direction": "long",
+    "timeframe_hours": 24,
+    "channel_bars": 20,
+    "trend_sma_bars": 0,
+    "trail_exit_bars": 10,
+    "atr_period": 14,
+    "stop_atr_multiple": 2.0,
+    "reward_to_risk": null,
+    "max_hold_bars": 365,
+    "max_entry_candle_atr_multiple": 2.0,
+    "require_research_candidate": true
+  },
+  "volatility_filter": {
+    "lookback_bars": 24,
+    "elevated_percentile": 80,
+    "extreme_percentile": 95,
+    "candle_expansion_elevated": 2.0,
+    "candle_expansion_extreme": 3.5,
+    "volume_z_elevated": 2.5,
+    "volume_z_extreme": 4.0,
+    "move_vs_average_elevated": 3.0,
+    "allow_elevated": false
+  },
+  "probability": {
+    "prior_mean": "breakeven",
+    "prior_strength": 30,
+    "backtest_weight": 0.25,
+    "batch_size": 10,
+    "min_trades_for_medium": 50,
+    "min_trades_for_high": 200,
+    "stop_if_prob_above_breakeven_below": 0.2
+  },
+  "research": {
+    "hold_hours": 4,
+    "large_move_threshold_pct": 2.0,
+    "date_range_splits": 3,
+    "min_sample_size": 100,
+    "family_alpha": 0.05,
+    "sessions_utc": {
+      "asia": [
+        0,
+        8
+      ],
+      "europe": [
+        8,
+        13
+      ],
+      "us_overlap": [
+        13,
+        17
+      ],
+      "us_late": [
+        17,
+        24
+      ]
+    }
+  },
+  "backtest": {
+    "train_fraction": 0.5,
+    "fee_pct": 0.1,
+    "slippage_pct": 0.05
+  },
+  "data": {
+    "csv_path": "data/btc_1h.csv",
+    "product": "BTC-USD",
+    "days_to_fetch": 730
+  },
+  "prediction_markets": {
+    "input_path": "data/prediction_markets.example.json",
+    "max_source_age_days": 14,
+    "min_edge_pct": 5.0,
+    "fee_pct": 2.0
+  }
+}

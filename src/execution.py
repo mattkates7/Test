@@ -27,7 +27,7 @@ class PaperTrade:
     direction: str
     entry: float
     stop: float
-    target: float
+    target: float | None  # None = no fixed target (trailing-stop exit)
     size: float
     max_dollar_risk: float
     est_probability: float
@@ -54,7 +54,7 @@ class PaperTrade:
                 f"SETUP: {self.setup} ({self.direction})",
                 f"SIMULATED ENTRY: {self.entry:,.2f}",
                 f"SIMULATED STOP: {self.stop:,.2f}",
-                f"SIMULATED TARGET: {self.target:,.2f}",
+                f"SIMULATED TARGET: {self.target:,.2f}" if self.target else "SIMULATED TARGET: none (trailing stop)",
                 f"SIMULATED POSITION SIZE: {self.size:.6f}",
                 f"MAX DOLLAR RISK: ${self.max_dollar_risk:,.2f}",
                 f"SIGNAL CONFIDENCE: {self.confidence} (est. win prob {self.est_probability:.1%})",
@@ -125,27 +125,33 @@ class PaperExecutor:
         )
         return self.position
 
-    def check_exit(self, candle, i, max_hold_bars):
+    def check_exit(self, candle, i, max_hold_bars, trail_level=None):
         """Simulate the open position through candle i. Returns closed trade or None.
 
         Conservative assumptions: a gap through the stop fills at the open; if
         stop and target are both inside one candle, the STOP is assumed hit first.
+        `trail_level` (known at this candle's close) can only TIGHTEN the stop,
+        and the tighter stop applies from the next candle on.
         """
         t = self.position
         if t is None:
             return None
         long = t.direction == "long"
+        stop = t.extra.get("active_stop", t.stop)
         exit_price, reason = None, ""
-        gapped = candle.open <= t.stop if long else candle.open >= t.stop
+        gapped = candle.open <= stop if long else candle.open >= stop
+        stop_label = "trailing stop hit" if stop != t.stop else "stop hit"
         if i > t.entry_index and gapped:
             exit_price, reason = candle.open, "gap through stop"
-        elif (candle.low <= t.stop) if long else (candle.high >= t.stop):
-            exit_price, reason = t.stop, "stop hit"
-        elif (candle.high >= t.target) if long else (candle.low <= t.target):
+        elif (candle.low <= stop) if long else (candle.high >= stop):
+            exit_price, reason = stop, stop_label
+        elif t.target is not None and ((candle.high >= t.target) if long else (candle.low <= t.target)):
             exit_price, reason = t.target, "target hit"
         elif i - t.entry_index + 1 >= max_hold_bars:
             exit_price, reason = candle.close, f"time exit after {max_hold_bars} bars"
         if exit_price is None:
+            if trail_level is not None:
+                t.extra["active_stop"] = max(stop, trail_level) if long else min(stop, trail_level)
             return None
         if reason != "target hit":  # market-style exits pay slippage; target is a limit
             exit_price = exit_price * (1 - self.slip) if long else exit_price * (1 + self.slip)

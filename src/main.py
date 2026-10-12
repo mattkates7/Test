@@ -128,6 +128,7 @@ def cmd_live(cfg, args):
 
 def build_parser():
     p = argparse.ArgumentParser(prog="python -m src.main", description=BANNER)
+    p.add_argument("--config", default="config.json", help="config file to use (default config.json)")
     sub = p.add_subparsers(dest="command", required=True)
 
     s = sub.add_parser("fetch-data", help="download real historical BTC candles (public, read-only)")
@@ -183,7 +184,7 @@ def build_parser():
 def main(argv=None):
     args = build_parser().parse_args(argv)
     try:
-        cfg = load_config()
+        cfg = load_config(resolve_path(args.config))
         assert_paper_mode(cfg, load_env())
         print(BANNER)
         args.func(cfg, args)

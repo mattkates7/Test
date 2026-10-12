@@ -1,4 +1,10 @@
-"""Signal generation (research signal) for the temporal-window strategy.
+"""Signal generation (research signal).
+
+Two strategy types (config `strategy.type`):
+  * "temporal_window" (default): trade the start of a time window.
+  * "breakout": trend-following channel breakout with a trailing stop.
+
+Notes for the temporal-window type:
 
 A signal fires at the OPEN of the first candle of the configured window
 (e.g. 14:00 UTC for hour_of_day=[14]). It only uses candles that have already
@@ -39,7 +45,34 @@ def window_name(ts, strat, sessions):
     return None
 
 
+def breakout_setup(candles, i, strat):
+    """Trend-following breakout, decided at the OPEN of candle i from closed candles.
+
+    Long: the previous candle CLOSED above the highest high of the
+    `channel_bars` candles before it (and above the `trend_sma_bars` average,
+    if set). Short is the mirror image.
+    """
+    n, sma_n = strat["channel_bars"], strat.get("trend_sma_bars", 0)
+    if i - 1 - max(n, sma_n) < 0:
+        return None
+    prev = candles[i - 1]
+    window = candles[i - 1 - n : i - 1]
+    if strat["direction"] == "long":
+        broke = prev.close > max(c.high for c in window)
+        trend_ok = not sma_n or prev.close > sum(c.close for c in candles[i - 1 - sma_n : i - 1]) / sma_n
+    else:
+        broke = prev.close < min(c.low for c in window)
+        trend_ok = not sma_n or prev.close < sum(c.close for c in candles[i - 1 - sma_n : i - 1]) / sma_n
+    return breakout_name(strat) if broke and trend_ok else None
+
+
+def breakout_name(strat):
+    return f"breakout_{strat['channel_bars']}bar"
+
+
 def configured_window_names(strat):
+    if strat.get("type") == "breakout":
+        return [breakout_name(strat)]
     fmt = {
         "hour_of_day": lambda v: f"hour_{int(v):02d}",
         "day_of_week": lambda v: f"day_{v}",
@@ -49,8 +82,11 @@ def configured_window_names(strat):
 
 
 def generate_signal(candles, i, atr, strat, sessions, research_verdicts):
-    """Return a Signal for candle i, or None if i is not the start of a window."""
-    name = window_name(candles[i].ts, strat, sessions)
+    """Return a Signal for candle i, or None if there is no setup at candle i."""
+    if strat.get("type") == "breakout":
+        name = breakout_setup(candles, i, strat)
+    else:
+        name = window_name(candles[i].ts, strat, sessions)
     if name is None:
         return None
     direction = strat["direction"]

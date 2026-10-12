@@ -17,6 +17,7 @@ from types import SimpleNamespace
 from . import probability_update as pu
 from . import temporal_research
 from .execution import PaperExecutor, blocked_ticket
+from .data_loader import resample
 from .indicators import atr_series
 from .risk_sizing import size_position
 from .signals import configured_window_names, generate_signal
@@ -26,21 +27,49 @@ from .volatility_filter import VolatilityFilter
 
 def _stop_and_target(entry, atr_value, strat):
     dist = strat["stop_atr_multiple"] * atr_value
-    rr = strat["reward_to_risk"]
-    if strat["direction"] == "long":
-        return entry - dist, entry + rr * dist
-    return entry + dist, entry - rr * dist
+    rr = strat.get("reward_to_risk")
+    sign = 1 if strat["direction"] == "long" else -1
+    target = entry + sign * rr * dist if rr else None  # None = trailing-stop exit only
+    return entry - sign * dist, target
 
 
-def _shadow_r_multiples(candles, start, end, atr, cfg):
-    """Mechanically trade every window in [start, end) with 1 unit. Returns R results."""
+def _trail_levels(candles, strat):
+    """Trailing exit level known at each candle's close: lowest low (long) or
+    highest high (short) of the last `trail_exit_bars` candles. None if unused."""
+    n = strat.get("trail_exit_bars")
+    if not n:
+        return [None] * len(candles)
+    long = strat["direction"] == "long"
+    out = []
+    for i in range(len(candles)):
+        w = candles[max(0, i - n + 1) : i + 1]
+        out.append(min(c.low for c in w) if long else max(c.high for c in w))
+    return out
+
+
+def _breakout_verdict(r_list, min_n):
+    """Research verdict for a non-window strategy, from its TRAIN shadow trades."""
+    import statistics
+    n = len(r_list)
+    if n < min_n:
+        return f"INSUFFICIENT SAMPLE (n={n} < {min_n})"
+    mean = statistics.fmean(r_list)
+    t = mean / (statistics.stdev(r_list) / n ** 0.5) if n > 1 and statistics.stdev(r_list) > 0 else 0
+    if mean <= 0 or t < 2:
+        return f"NO EDGE FOUND (avg {mean:+.2f}R, t={t:.2f})"
+    return f"CANDIDATE (needs out-of-sample paper test; avg {mean:+.2f}R, t={t:.2f})"
+
+
+def _shadow_r_multiples(candles, start, end, atr, cfg, trail=None):
+    """Mechanically trade every setup in [start, end) with 1 unit. Returns R results."""
     strat, bt = cfg["strategy"], cfg["backtest"]
+    trail = trail or [None] * len(candles)
     ex = PaperExecutor("shadow", bt["fee_pct"], bt["slippage_pct"])
     mechanical = dict(strat, require_research_candidate=False)
     results = []
     for i in range(max(start, 1), end):
         if ex.position is not None:
-            t = ex.check_exit(candles[i], i, strat["max_hold_bars"])
+            t = ex.check_exit(candles[i], i, strat["max_hold_bars"], trail[i])
             if t:
                 results.append(t.pnl / t.max_dollar_risk)
             continue
@@ -52,7 +81,7 @@ def _shadow_r_multiples(candles, start, end, atr, cfg):
         sizing = SimpleNamespace(position_size=1.0, dollar_risk=abs(entry - stop))
         vol = SimpleNamespace(condition="n/a")
         ex.open_trade(candles[i].ts, i, sig, entry, stop, target, sizing, 0.0, "n/a", vol)
-        t = ex.check_exit(candles[i], i, strat["max_hold_bars"])
+        t = ex.check_exit(candles[i], i, strat["max_hold_bars"], trail[i])
         if t:
             results.append(t.pnl / t.max_dollar_risk)
     return results
@@ -72,17 +101,29 @@ def run_backtest(candles, cfg, paths, data_label, verbose_tickets=3):
     sessions = cfg["research"]["sessions_utc"]
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 
+    is_breakout = strat.get("type") == "breakout"
+    if is_breakout:
+        candles = resample(candles, strat["timeframe_hours"])
+        data_label += f", {strat['timeframe_hours']}h bars"
+    fallback_rr = strat.get("reward_to_risk") or 1.0
+
     split = int(len(candles) * bt["train_fraction"])
     train, test_start = candles[:split], split
     atr = atr_series(candles, strat["atr_period"])
-
-    # --- Research on TRAIN only (no peeking at the test period) ---
-    research = temporal_research.analyze(train, cfg)
-    verdicts = {w["window"]: w["verdict"] for w in research["windows"]}
+    trail = _trail_levels(candles, strat)
 
     # --- Shadow run on TRAIN to estimate win rate / payoff ---
-    train_r = _shadow_r_multiples(candles, 0, split, atr, cfg)
-    tw, tl, avg_win_r, avg_loss_r = _win_loss_stats(train_r, strat["reward_to_risk"])
+    train_r = _shadow_r_multiples(candles, 0, split, atr, cfg, trail)
+    tw, tl, avg_win_r, avg_loss_r = _win_loss_stats(train_r, fallback_rr)
+
+    # --- Research on TRAIN only (no peeking at the test period) ---
+    if is_breakout:
+        verdict = _breakout_verdict(train_r, risk["min_sample_size"])
+        verdicts = {configured_window_names(strat)[0]: verdict}
+        research = {"overall_verdict": verdict}
+    else:
+        research = temporal_research.analyze(train, cfg)
+        verdicts = {w["window"]: w["verdict"] for w in research["windows"]}
     breakeven = pu.breakeven_win_rate(avg_win_r, avg_loss_r)
     estimate = pu.make_prior(prob_cfg, breakeven, tw, tl)
     confidence = "LOW"
@@ -136,7 +177,7 @@ def run_backtest(candles, cfg, paths, data_label, verbose_tickets=3):
         c = candles[i]
         was_open = executor.position is not None
         if was_open:
-            t = executor.check_exit(c, i, strat["max_hold_bars"])
+            t = executor.check_exit(c, i, strat["max_hold_bars"], trail[i])
             if t:
                 close_trade(t)
                 maybe_update()
@@ -149,7 +190,7 @@ def run_backtest(candles, cfg, paths, data_label, verbose_tickets=3):
         entry = executor.entry_price(c.open, sig.direction)
         stop, target = _stop_and_target(entry, atr[i - 1], strat)
         all_r = train_r + test_r
-        _, _, aw, al = _win_loss_stats(all_r, strat["reward_to_risk"])
+        _, _, aw, al = _win_loss_stats(all_r, fallback_rr)
         sizing = size_position(
             account_size=balance,
             win_probability=estimate.mean,
@@ -181,7 +222,7 @@ def run_backtest(candles, cfg, paths, data_label, verbose_tickets=3):
             print("\n" + trade.ticket())
             print(sizing.report())
             shown_open += 1
-        t = executor.check_exit(c, i, strat["max_hold_bars"])
+        t = executor.check_exit(c, i, strat["max_hold_bars"], trail[i])
         if t:
             close_trade(t)
             maybe_update()
