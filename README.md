@@ -58,6 +58,9 @@ python -m unittest discover -s tests
 # Get REAL historical BTC data (public Coinbase candles, no account or key needed)
 python -m src.main fetch-data              # default: last 730 days of 1h candles
 
+#   ...or import a CSV from CryptoDataDownload (e.g. Bitstamp_BTCUSD_1h.csv):
+#   python -m src.main import-csv path/to/Bitstamp_BTCUSD_1h.csv
+
 #   ...or, if you're offline, make SYNTHETIC random data to test the plumbing:
 #   python -m src.main make-sample-data
 

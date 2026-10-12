@@ -161,3 +161,27 @@ def make_synthetic_candles(days=730, start_price=30000.0, seed=7):
         price = close
         ts += timedelta(hours=1)
     return candles
+
+
+def import_cryptodatadownload(src_path):
+    """Read a CryptoDataDownload hourly CSV (e.g. Bitstamp_BTCUSD_1h.csv).
+
+    Handles their quirks: a website banner on line 1, newest-first ordering,
+    and older rows where the 'Volume BTC' and 'Volume USD' columns are swapped
+    (BTC volume is always the smaller of the two, so we take the min).
+    """
+    with open(src_path, newline="") as f:
+        lines = f.read().splitlines()
+    start = next(i for i, line in enumerate(lines) if line.lower().startswith("unix,"))
+    candles = []
+    for row in csv.DictReader(lines[start:]):
+        vols = [float(v) for k, v in row.items() if k and k.lower().startswith("volume") and v]
+        o, h, l, c = (float(row[k]) for k in ("open", "high", "low", "close"))
+        if min(o, h, l, c) <= 0:
+            continue  # skip broken rows
+        ts = float(row["unix"])
+        if ts > 1e12:  # some files use milliseconds
+            ts /= 1000
+        candles.append(Candle(datetime.fromtimestamp(ts, tz=timezone.utc), o, h, l, c, min(vols) if vols else 0.0))
+    candles.sort(key=lambda x: x.ts)
+    return candles

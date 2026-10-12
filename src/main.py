@@ -5,6 +5,7 @@ Every command first checks that the project is in PAPER MODE.
 
 import argparse
 import sys
+from pathlib import Path
 
 from . import dashboard, data_loader, prediction_markets, temporal_research
 from . import probability_update as pu
@@ -41,6 +42,15 @@ def cmd_fetch_data(cfg, args):
     path = resolve_path(cfg["data"]["csv_path"])
     data_loader.save_candles(candles, path, "coinbase")
     print(f"Saved {len(candles)} candles to {path}")
+
+
+def cmd_import_csv(cfg, args):
+    candles = data_loader.import_cryptodatadownload(args.file)
+    path = resolve_path(cfg["data"]["csv_path"])
+    data_loader.save_candles(candles, path, f"imported: {Path(args.file).name}")
+    gaps = sum(1 for a, b in zip(candles, candles[1:]) if (b.ts - a.ts).total_seconds() != 3600)
+    print(f"Imported {len(candles)} candles ({candles[0].ts:%Y-%m-%d} .. {candles[-1].ts:%Y-%m-%d}), "
+          f"{gaps} gaps, saved to {path}")
 
 
 def cmd_make_sample_data(cfg, args):
@@ -123,6 +133,10 @@ def build_parser():
     s = sub.add_parser("fetch-data", help="download real historical BTC candles (public, read-only)")
     s.add_argument("--days", type=int)
     s.set_defaults(func=cmd_fetch_data)
+
+    s = sub.add_parser("import-csv", help="import a CryptoDataDownload hourly CSV (e.g. Bitstamp_BTCUSD_1h.csv)")
+    s.add_argument("file")
+    s.set_defaults(func=cmd_import_csv)
 
     s = sub.add_parser("make-sample-data", help="create SYNTHETIC data to test the pipeline offline")
     s.add_argument("--days", type=int)
